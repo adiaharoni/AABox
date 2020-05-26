@@ -2,9 +2,14 @@ import socket
 import select
 from datetime import datetime
 import serverBL
+import configparser
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+server_port = int(config['DEFAULT']['serverPort'])
+server_ip = config['DEFAULT']['serverIp']
 server_socket = socket.socket()
-server_socket.bind(("192.168.1.209", 2223))
+server_socket.bind((server_ip, server_port))
 server_socket.listen(5)
 open_client_sockets = []
 messages_to_send = []
@@ -147,12 +152,24 @@ def play_cell_game(time1, user_name, command, sender_msg):
     if status_code == "12":
         # tie
         opponent_play_cell_game(opponent_user_name, user_name, server_game_number, cell, "12", score1, score)
+        (scores_status_code, top_scores_str) = serverBL.top_scores()
+        top_scores_mesg = "09" + str(scores_status_code).zfill(2) + str(len(top_scores_str)).zfill(4) + top_scores_str
+        publish_top_scores(top_scores_mesg)
     elif status_code == "13":
         # win
         opponent_play_cell_game(opponent_user_name, user_name, server_game_number, cell, "14", score1, score)
+        (scores_status_code, top_scores_str) = serverBL.top_scores()
+        top_scores_mesg = "09" + str(scores_status_code).zfill(2) + str(len(top_scores_str)).zfill(4) + top_scores_str
+        publish_top_scores(top_scores_mesg)
     else:
         opponent_play_cell_game(opponent_user_name, user_name, server_game_number, cell, status_code, 0, 0)
     return str(command).zfill(2) + server_game_number + str(status_code).zfill(2) + str(len(str(score))).zfill(2) + str(score) + str(len(str(score1))).zfill(2) + str(score1)
+
+
+def publish_top_scores(top_scores):
+    data = str.encode(top_scores)
+    for open_client_socket in open_client_sockets:
+        messages_to_send.append((open_client_socket, data))
 
 
 def abort_game(time1, user_name, command, sender_msg):
@@ -164,7 +181,16 @@ def abort_game(time1, user_name, command, sender_msg):
     if status_code == "15":
         # abort during game, so opponent wins
         opponent_play_cell_game(opponent_user_name, user_name, game_number, 0, "15", opponent_score, score)
+        (scores_status_code, top_scores_str) = serverBL.top_scores()
+        top_scores_mesg = "09" + str(scores_status_code).zfill(2) + str(len(top_scores_str)).zfill(4) + top_scores_str
+        publish_top_scores(top_scores_mesg)
     return str(command).zfill(2) + game_number + "00"
+
+
+def top_scores(time1, user_name, command, sender_msg):
+    print(time1 + "top scores " + user_name)
+    (status_code, top_scores_str) = serverBL.top_scores()
+    return str(command).zfill(2)+str(status_code).zfill(2)+str(len(top_scores_str)).zfill(4) + top_scores_str
 
 
 while (True):
@@ -212,6 +238,8 @@ while (True):
                         ret = play_cell_game(time1, user_name, command, sender_msg)
                     elif command == 8:
                         ret = abort_game(time1, user_name, command, sender_msg)
+                    elif command == 9:
+                        ret = top_scores(time1, user_name, command, sender_msg)
                     else:
                         # command unknown
                         ret = str(command).zfill(2) + "99"

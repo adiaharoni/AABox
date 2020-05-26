@@ -157,6 +157,7 @@ class Toplevel1:
         self.entry_password.configure(insertbackground="black")
         self.entry_password.configure(selectbackground="#c4c4c4")
         self.entry_password.configure(selectforeground="black")
+        self.entry_password.configure(show="*")
 
         self.Label_password = tk.Label(self.Frame1)
         self.Label_password.place(relx=0.087, rely=0.62, height=31, width=84)

@@ -4,12 +4,14 @@ from datetime import datetime
 from threading import *
 from time import sleep
 from queue import Queue
+import configparser
 
 send_q = Queue()  # all the messages from client to server
 my_socket = None
 _login_res = None
 _register_res = None
 _forgot_password_res = None
+_top_scores_res = None
 _want_to_play_res = None
 _play_cell_game_res = None
 _communication_error = None
@@ -27,11 +29,14 @@ def connect_server():
     global my_socket
     try:
         my_socket = socket()
-        #my_socket.connect(("127.0.0.1", 2223))
-        my_socket.connect(("192.168.1.209", 2223))
+        config = configparser.ConfigParser()
+        config.read('..\config.ini')
+        server_ip = config['DEFAULT']['serverIp']
+        server_port = int(config['DEFAULT']['serverPort'])
+        my_socket.connect((server_ip, server_port))
     except:
-         print("error connecting to the server")
-         return False
+        print("error connecting to the server")
+        return False
     global running
     running = True
     return True
@@ -119,6 +124,13 @@ def abort_game(username, game_id, game_number):
     send_q.put(str_data)
 
 
+def top_scores(top_scores_res, username):
+    global _top_scores_res
+    _top_scores_res = top_scores_res
+    str_data = create_header("09", username) + ""
+    send_q.put(str_data)
+
+
 """
 Parse responses from server
 """
@@ -130,6 +142,7 @@ def set_register_res(msg):
     status_text = get_status_text(status_code)
     global _register_res
     _register_res(status_code, status_text)
+    return msg[2:]
 
 
 def set_login_res(msg):
@@ -138,6 +151,7 @@ def set_login_res(msg):
     status_text = get_status_text(status_code)
     global _login_res
     _login_res(status_code, status_text)
+    return msg[2:]
 
 
 def set_forgot_password_res(msg):
@@ -147,6 +161,7 @@ def set_forgot_password_res(msg):
     password = msg[4:4+int(password_len)]
     global _forgot_password_res
     _forgot_password_res(status_code, status_text, password)
+    return msg[4+int(password_len):]
 
 
 def set_want_to_play_res(msg):
@@ -172,8 +187,10 @@ def set_want_to_play_res(msg):
         idx = idx+2
         opponent_score = msg[idx:idx+opponent_score_len]
         idx = idx+opponent_score_len
-        server_game_number = msg[idx:]
+        server_game_number = msg[idx:idx+36]
         _want_to_play_res(status_code, status_txt, game_number, score, opponent_user_name, opponent_score, server_game_number)
+        idx = idx + 36
+    return msg[idx:]
 
 
 def parse_scores(msg):
@@ -206,21 +223,27 @@ def set_start_game(msg):
     idx = idx+36
     parse_idx, score, opponent_score = parse_scores(msg[idx:])
     idx = idx + parse_idx
-    server_game_number = msg[idx:]
+    server_game_number = msg[idx:idx+36]
+    idx = idx+36
     global _want_to_play_res
     _want_to_play_res("09", get_status_text("09"), game_number, score, opponent_user_name, opponent_score, server_game_number)
+    return msg[idx:]
 
 
 def set_play_cell_game_res(msg):
+    print("set_play_cell_game_res:" + msg)
     server_game_number = msg[0:36]
     status_code = msg[36:38]
     status_text = get_status_text(status_code)
     parse_idx, score, opponent_score = parse_scores(msg[38:])
     global _play_cell_game_res
     _play_cell_game_res(server_game_number, status_code, status_text, 0, None, score, opponent_score)
+    print("rest of message:" + msg[parse_idx+38:])
+    return msg[parse_idx+38:]
 
 
 def set_opponent_play_cell_game(msg):
+    print("set_opponent_play_cell_game:" + msg)
     idx = 0
     time1 = msg[idx:idx + 14]
     print("time1:" + time1)
@@ -239,14 +262,30 @@ def set_opponent_play_cell_game(msg):
     idx = idx + 2
     status_text = get_status_text(status_code)
     parse_idx, score, opponent_score = parse_scores(msg[idx:])
+    idx = idx + parse_idx
     global _play_cell_game_res
     _play_cell_game_res(server_game_number, status_code, status_text, 1, cell, score, opponent_score)
+    return msg[idx:]
 
 
 def set_abort_game_res(msg):
     game_number = msg[0:36]
     status_code = msg[36:38]
     print("set_abort_game_res game_number:" + game_number + " status_code: " + status_code)
+    return msg[38:]
+
+
+def set_top_scores_res(msg):
+    status_code = msg[0:2]
+    status_text = get_status_text(status_code)
+    idx = 2
+    top_scores_str_len = int(msg[idx:idx+4])
+    idx = idx+4
+    top_scores_str = msg[idx:idx+top_scores_str_len]
+    idx = idx+top_scores_str_len
+    global _top_scores_res
+    _top_scores_res(status_code, status_text, top_scores_str)
+    return msg[idx:]
 
 
 """
@@ -279,27 +318,33 @@ def client_receive(my_socket):
                     break
                     """get out from thread"""
                 receive_data = receive_data.decode()
-                print("client_receive:" + receive_data)
-                cmd_id = int(receive_data[0:2])
-                msg = receive_data[2:]
-                if cmd_id == 1:
-                    set_register_res(msg)
-                elif cmd_id == 2:
-                    set_login_res(msg)
-                elif cmd_id == 3:
-                    set_forgot_password_res(msg)
-                elif cmd_id == 4:
-                    set_want_to_play_res(msg)
-                elif cmd_id == 5:
-                    set_start_game(msg)
-                elif cmd_id == 6:
-                    set_play_cell_game_res(msg)
-                elif cmd_id == 7:
-                    set_opponent_play_cell_game(msg)
-                elif cmd_id == 8:
-                    set_abort_game_res(msg)
-                else:
-                    print("command unknown:" + receive_data)
+                #data read from the socket may be from multipule messages,
+                #so the parsing functions will parse their message and return the rest of the data
+                while len(receive_data) > 0:
+                    print("client_receive:" + receive_data)
+                    cmd_id = int(receive_data[0:2])
+                    msg = receive_data[2:]
+                    if cmd_id == 1:
+                        receive_data = set_register_res(msg)
+                    elif cmd_id == 2:
+                        receive_data = set_login_res(msg)
+                    elif cmd_id == 3:
+                        receive_data = set_forgot_password_res(msg)
+                    elif cmd_id == 4:
+                        receive_data = set_want_to_play_res(msg)
+                    elif cmd_id == 5:
+                        receive_data = set_start_game(msg)
+                    elif cmd_id == 6:
+                        receive_data = set_play_cell_game_res(msg)
+                    elif cmd_id == 7:
+                        receive_data = set_opponent_play_cell_game(msg)
+                    elif cmd_id == 8:
+                        receive_data = set_abort_game_res(msg)
+                    elif cmd_id == 9:
+                        receive_data = set_top_scores_res(msg)
+                    else:
+                        print("command unknown:" + receive_data)
+                        receive_data = ""
 
 
 """

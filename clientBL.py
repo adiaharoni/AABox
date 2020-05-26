@@ -4,6 +4,7 @@ import clientComm
 _fe_login_res = None
 _fe_register_res = None
 _fe_forgot_password_res = None
+_fe_top_scores_res = None
 _fe_communication_error = None
 _callback_dict = {}
 _username = ""
@@ -28,7 +29,7 @@ def get_user_name():
     return _username
 
 
-def register(fe_register_res,username, password, city, birth_year, mothers_name):
+def register(fe_register_res, username, password, city, birth_year, mothers_name):
     global _fe_register_res
     _fe_register_res = fe_register_res
     global _username
@@ -80,6 +81,13 @@ def abort_game(game_id, game_number):
     del _callback_dict[game_number]
 
 
+def top_scores(fe_top_scores_res):
+    global _fe_top_scores_res
+    _fe_top_scores_res = fe_top_scores_res
+    global _username
+    clientComm.top_scores(top_scores_res, _username)
+
+
 def register_res(status_code, status_txt):
     print("BL status_code=" + str(status_code) + " text:" + status_txt)
     global _fe_register_res
@@ -123,3 +131,8 @@ def play_cell_game_res(server_game_number, status_code, status_text, opponent_mo
     global _callback_dict
     fe_play_cell_game_res = _callback_dict[server_game_number]
     fe_play_cell_game_res(status_code, status_text, opponent_move, cell, score, opponent_score)
+
+
+def top_scores_res(status_code, status_txt, top_scores_str):
+    global _fe_top_scores_res
+    _fe_top_scores_res(status_code, status_txt, top_scores_str)

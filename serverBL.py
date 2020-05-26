@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import uuid
+import json
 
 want_to_play_dict = {}
 dbName = "AAbox.db"
@@ -86,7 +87,6 @@ def forgot_password(username, city, birth_year, mothers_name):
     sys.stdout.flush()
     return ret, password
 
-
 def get_scores(username, username1, game_id):
     query = "SELECT * from GAMES where username in ( '" + username1 + "' ,  '" + username + "' ) and game_id = " + game_id
     print("query = ", query, "\n")
@@ -128,8 +128,7 @@ def want_to_play(username, game_id, game_number):
 
 def set_score(result_num, username, game_id):
     conn = sqlite3.connect('AAbox.db')
-    cursor = conn.execute(
-        "SELECT * from GAMES where username= '" + username + "' and game_id= '" + game_id + "'")
+    cursor = conn.execute("SELECT * from GAMES where username= '" + username + "' and game_id= '" + game_id + "'")
     rows = cursor.fetchall()
     if len(rows) == 0:
         print("not in db!")
@@ -140,8 +139,7 @@ def set_score(result_num, username, game_id):
             print("in cursor")
             score = row[2]
         new_score = score + result_num
-        conn.execute("UPDATE GAMES SET score = '" + str(new_score) + "' WHERE username = '" + username + 
-                     "' and game_id= '" + game_id + "'")
+        conn.execute("UPDATE GAMES SET score = '" + str(new_score) + "' WHERE username = '" + username + "' and game_id= '" + game_id + "'")
     conn.commit()
     conn.close()
     sys.stdout.flush()
@@ -416,3 +414,16 @@ def abort_game(username, game_id, game_number):
     print("serverBL abort_game " + username + " abort_game " + game_id + " cant find game to abort")
     return "00", None, None, None
 
+
+def top_scores():
+    print("top scores")
+    query = "SELECT *FROM GAMES AS a WHERE a.username IN (SELECT b.username FROM GAMES AS b WHERE a.game_id = b.game_id ORDER BY b.score DESC LIMIT 3)order by game_id, score DESC"
+    print("query = ", query, "\n")
+    conn = sqlite3.connect('AAbox.db')
+    cursor = conn.execute(query)
+    rows = cursor.fetchall()
+    top_scores_str = json.dumps(rows)
+    print(top_scores_str)
+    conn.close()
+    sys.stdout.flush()
+    return "00", top_scores_str

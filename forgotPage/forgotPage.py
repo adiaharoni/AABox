@@ -132,8 +132,7 @@ class Toplevel1:
         self.inst_label.configure(foreground="#ffffff")
         self.inst_label.configure(font=font13)
         self.inst_label.configure(relief="flat")
-        self.inst_label.configure(text='''In order to get your password, you should fill those details,
-and then you will see your password in the command line''')
+        self.inst_label.configure(text='''In order to get your password, you should fill those details:''')
 
         self.return_button = tk.Button(self.Frame1)
         self.return_button.place(relx=0.138, rely=0.88, height=44, width=131)

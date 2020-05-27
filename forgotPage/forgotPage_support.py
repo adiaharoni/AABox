@@ -2,6 +2,7 @@ import sqlite3
 import sys
 import clientBL
 
+
 def fe_forgot_password_res(status_code, status_txt, password):
     global w
     print('forgot_password_Res')
@@ -24,9 +25,11 @@ except ImportError:
     import tkinter.ttk as ttk
     py3 = True
 
+
 def backEntryPage():
     sys.stdout.flush()
     destroy_window()
+
 
 def forgotPassword(p1):
     global w
@@ -48,17 +51,20 @@ def forgotPassword(p1):
     else:
         clientBL.forgot_password(fe_forgot_password_res, username, city, birthYear, mothersName)
 
+
 def init(top, gui, *args, **kwargs):
     global w, top_level, root
     w = gui
     top_level = top
     root = top
 
+
 def destroy_window():
     # Function which closes the window.
     global top_level
     top_level.destroy()
     top_level = None
+
 
 if __name__ == '__main__':
     import forgotPage
